@@ -1,5 +1,9 @@
 <?php
 
+// Log the incoming request for debugging
+file_put_contents('log.txt', "Headers:\n" . print_r(getallheaders(), true), FILE_APPEND);
+file_put_contents('log.txt', "Payload:\n" . $payload . "\n", FILE_APPEND);
+
 $payload = file_get_contents('php://input');
 $headers = getallheaders();
 $result = endpointVerify($headers, $payload, '0f8ab6334fbbe0ec9ee562fd5a43ea1e8a80e8b52cc7734037897ea3b09e9d39');
@@ -11,23 +15,36 @@ function endpointVerify(array $headers, string $payload, string $publicKey): arr
     if (
         !isset($headers['X-Signature-Ed25519'])
         || !isset($headers['X-Signature-Timestamp'])
-    )
+    ) {
+        file_put_contents('log.txt', "Missing signature or timestamp header\n", FILE_APPEND);
         return ['code' => 401, 'payload' => null];
+    }
 
     $signature = $headers['X-Signature-Ed25519'];
     $timestamp = $headers['X-Signature-Timestamp'];
 
-    if (!ctype_xdigit($signature))
+    if (!ctype_xdigit($signature)) {
+        file_put_contents('log.txt', "Invalid signature format\n", FILE_APPEND);
         return ['code' => 401, 'payload' => null];
+    }
 
     $message = $timestamp . $payload;
+    file_put_contents('log.txt', "Message:\n" . $message . "\n", FILE_APPEND);
+
     $binarySignature = sodium_hex2bin($signature);
     $binaryKey = sodium_hex2bin($publicKey);
 
-    if (!sodium_crypto_sign_verify_detached($binarySignature, $message, $binaryKey))
+    if (!sodium_crypto_sign_verify_detached($binarySignature, $message, $binaryKey)) {
+        file_put_contents('log.txt', "Signature verification failed\n", FILE_APPEND);
         return ['code' => 401, 'payload' => null];
+    }
 
     $payload = json_decode($payload, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        file_put_contents('log.txt', "JSON decode error: " . json_last_error_msg() . "\n", FILE_APPEND);
+        return ['code' => 400, 'payload' => null];
+    }
+
     switch ($payload['type']) {
         case 1:
             return ['code' => 200, 'payload' => ['type' => 1]];
