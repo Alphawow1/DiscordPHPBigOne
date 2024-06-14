@@ -1,22 +1,23 @@
 <?php
 
 $payload = file_get_contents('php://input');
-$result = endpointVerify($_SERVER, $payload, 'discord app public key');
+$headers = getallheaders();
+$result = endpointVerify($headers, $payload, '0f8ab6334fbbe0ec9ee562fd5a43ea1e8a80e8b52cc7734037897ea3b09e9d39');
 http_response_code($result['code']);
 echo json_encode($result['payload']);
 
 function endpointVerify(array $headers, string $payload, string $publicKey): array
 {
     if (
-        !isset($headers['HTTP_X_SIGNATURE_ED25519'])
-        || !isset($headers['HTTP_X_SIGNATURE_TIMESTAMP'])
+        !isset($headers['X-Signature-Ed25519'])
+        || !isset($headers['X-Signature-Timestamp'])
     )
         return ['code' => 401, 'payload' => null];
 
-    $signature = $headers['HTTP_X_SIGNATURE_ED25519'];
-    $timestamp = $headers['HTTP_X_SIGNATURE_TIMESTAMP'];
+    $signature = $headers['X-Signature-Ed25519'];
+    $timestamp = $headers['X-Signature-Timestamp'];
 
-    if (!trim($signature, '0..9A..Fa..f') == '')
+    if (!ctype_xdigit($signature))
         return ['code' => 401, 'payload' => null];
 
     $message = $timestamp . $payload;
@@ -35,6 +36,6 @@ function endpointVerify(array $headers, string $payload, string $publicKey): arr
         default:
             return ['code' => 400, 'payload' => null];
     }
-} 
+}
 
-endpointVerify(getallheaders(),  $payload, '0f8ab6334fbbe0ec9ee562fd5a43ea1e8a80e8b52cc7734037897ea3b09e9d39');
+?>
