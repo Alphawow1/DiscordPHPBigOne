@@ -17,3 +17,4 @@ if (Interaction::verifyKey($postData, $signature, $timestamp, $CLIENT_PUBLIC_KEY
   http_response_code(401);
   echo "Not verified";
 }
+?>
