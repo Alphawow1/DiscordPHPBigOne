@@ -1,8 +1,7 @@
-<?php
-require_once 'DiscordInteraction.php';
+<?php 
 
-use Discord\Interaction;
-use Discord\InteractionResponseType;
+use Interaction;
+use InteractionResponseType;
 
 $CLIENT_PUBLIC_KEY = getenv('0f8ab6334fbbe0ec9ee562fd5a43ea1e8a80e8b52cc7734037897ea3b09e9d39');
 
