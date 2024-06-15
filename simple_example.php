@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../DiscordInteraction.php';
+require_once 'DiscordInteraction.php';
 
 use Discord\Interaction;
 use Discord\InteractionResponseType;
