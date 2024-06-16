@@ -2,78 +2,86 @@
 <?php
 
 // Replace with your Discord Bot Token (keep it secret)
-$botToken = '0f8ab6334fbbe0ec9ee562fd5a43ea1e8a80e8b52cc7734037897ea3b09e9d39';
+$botToken = '0f8ab6334fbbe0ec9ee562fd5a43ea1e8a80e8b52cc7734037897ea3b09e9d39'; 
 
-// Get request data (replace with actual method for security)
-$rawData = file_get_contents('php://input');
+$payload = file_get_contents('php://input');
+endpointVerify($_SERVER, $payload, $botToken);
 
-// Verify request (security is crucial!)
-if (!verifyRequest($rawData)) {
-  http_response_code(401);
-  exit;
-}
+function endpointVerify(array $headers, string $payload, string $publicKey)
+{
+    if (
+        !isset($headers['HTTP_X_SIGNATURE_ED25519'])
+        || !isset($headers['HTTP_X_SIGNATURE_TIMESTAMP'])
+    )
+        return ['code' => 401, 'payload' => null];
 
-// Decode the JSON data
-$data = json_decode($rawData, true);
+    $signature = $headers['HTTP_X_SIGNATURE_ED25519'];
+    $timestamp = $headers['HTTP_X_SIGNATURE_TIMESTAMP'];
 
-// Handle the interaction based on type
-if (isset($data['type']) && $data['type'] === 1) {
-  // It's a Slash Command interaction
-  handleSlashCommand($data);
-} else {
-  // Handle other interaction types (optional)
-  http_response_code(400); // Bad request
-  exit;
-}
+    if (!trim($signature, '0..9A..Fa..f') == '')
+        return ['code' => 401, 'payload' => null];
 
+    $message = $timestamp . $payload;
+    $binarySignature = sodium_hex2bin($signature);
+    $binaryKey = sodium_hex2bin($publicKey);
 
-// Function to verify the request (replace with actual verification logic)
-function verifyRequest($data) {
-  // This is a placeholder, implement proper signature verification using Discord's headers
-  // You'll need to retrieve the public key from your Discord application settings
-  // Refer to Discord's documentation for secure verification: https://discord.com/developers/docs/interactions/receiving-and-responding
+    if (!sodium_crypto_sign_verify_detached($binarySignature, $message, $binaryKey))
+        return ['code' => 401, 'payload' => null];
 
-  return true; // Placeholder, replace with actual verification logic
-}
+    $payload = json_decode($payload, true);
+    switch ($payload['type'])
+    {
+        // Verification
+        case 1:
+            $result = ['code' => 200, 'payload' => ['type' => 1]];
+            http_response_code($result['code']);
+            echo json_encode($result['payload']);
+            break;
 
-// Function to handle Slash Commands (replace with your command logic)
-function handleSlashCommand($data) {
-  $command = $data['data']['name'];
-  $channelId = $data['channel_id'];
+        // Bot messages
+        case 2:
+            $body = [
+                'code' => 200, 
+                'payload' => [
+                    'type' => 5
+                ]
+            ];
+            http_response_code($body['code']);
+            echo json_encode($body['payload']);
 
-  $response = [
-    "type" => 4,
-    "data" => [
-      "content" => "This is a response to the command: $command"
-    ]
-  ];
+            if ($payload["data"]["name"] == 'lfg')
+            {
+                $body = [
+                    'code' => 200, 
+                    'payload' => [
+                        'type' => 4, 
+                        'data' => [
+                            "tts" => False,
+                            "content" => "Message to test reply to discord",
+                            "embeds" => [],
+                            "allowed_mentions" => [
+                                "parse" => []
+                            ]
+                        ]
+                    ]
+                ];
+                http_response_code($body['code']);
+                echo json_encode($body['payload']);
+            }
+            else
+            {
+                $result = ['code' => 200, 'payload' => ['type' => 2]];
+                http_response_code($result['code']);
+                echo json_encode($result['payload']);
+                
+            }
+            break;
 
-  sendResponse($response);
-}
-
-// Function to send a response to Discord (replace with actual sending logic)
-function sendResponse($data) {
-  $url = "https://discord.com/api/interactions/" . $data['interaction']['id'] . "/" . $data['interaction']['token'] . "/callback";
-  $headers = array(
-    "Content-Type: application/json",
-    "Authorization: Bot $botToken"
-  );
-
-  $ch = curl_init($url);
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-  $response = curl_exec($ch);
-  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-  curl_close($ch);
-
-  if ($httpCode !== 200) {
-    // Handle sending error
-    echo "Failed to send response, code: $httpCode";
-  }
+        default:
+            $result = ['code' => 400, 'payload' => null];
+            http_response_code($result['code']);
+            echo json_encode($result['payload']);
+    }
 }
 
 ?>
